@@ -13,23 +13,16 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Update iStoreOS repository
+      - name: Clean and clone iStoreOS repository
         id: update
         run: |
-          cd /opt/make-lxc/istoreos
-          git fetch origin
-          git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
+          rm -rf /opt/make-lxc/istoreos
+          cd /opt/make-lxc
+          git clone https://github.com/istoreos/istoreos.git
+          cd istoreos
           BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
-          echo "Updated to branch: $BRANCH_NAME"
-
-      - name: Clean previous build artifacts
-        run: |
-          cd /opt/make-lxc/istoreos
-          make clean
-          ./scripts/feeds clean
-          rm -f build.log
-          echo "Cleaned build artifacts and caches"
+          echo "Cloned fresh repository, branch: $BRANCH_NAME"
 
       - name: Download config and feeds
         run: |
