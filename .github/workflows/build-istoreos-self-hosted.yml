@@ -13,9 +13,6 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Update iStoreOS repository
         id: update
         run: |
@@ -75,12 +72,10 @@ jobs:
 
       - name: Build firmware
         id: build
-        continue-on-error: true
         run: |
           cd /opt/make-lxc/istoreos
           export FORCE_UNSAFE_CONFIGURE=1
-          make -j$(nproc) V=s 2>&1 | tee build.log
-          echo "build_status=$?" >> $GITHUB_OUTPUT
+          make -j$(nproc) V=s
 
       - name: Check build result and prepare artifacts
         id: prepare
@@ -93,16 +88,9 @@ jobs:
             echo "Build successful! Found: $ROOTFS_FILE"
           else
             echo "build_success=false" >> $GITHUB_OUTPUT
-            echo "Build failed! Preserving build.log"
+            echo "Build failed!"
+            exit 1
           fi
-
-      - name: Upload build log on failure
-        if: steps.prepare.outputs.build_success != 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log-failed-${{ github.run_number }}
-          path: /opt/make-lxc/istoreos/build.log
-          retention-days: 30
 
       - name: Create Release
         if: steps.prepare.outputs.build_success == 'true'
