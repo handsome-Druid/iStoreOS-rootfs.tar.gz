@@ -1,0 +1,135 @@
+name: Build iStoreOS (Self-Hosted)
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: self-hosted
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update iStoreOS repository
+        id: update
+        run: |
+          cd /opt/make-lxc/istoreos
+          git fetch origin
+          git reset --hard origin/$(git rev-parse --abbrev-ref HEAD)
+          BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "Updated to branch: $BRANCH_NAME"
+
+      - name: Clean previous build artifacts
+        run: |
+          cd /opt/make-lxc/istoreos
+          make clean
+          ./scripts/feeds clean
+          rm -f build.log
+          echo "Cleaned build artifacts and caches"
+
+      - name: Download config and feeds
+        run: |
+          cd /opt/make-lxc/istoreos
+          wget -O .config https://fw0.koolcenter.com/iStoreOS/x86_64/config.seed
+          wget -O feeds.conf https://fw0.koolcenter.com/iStoreOS/x86_64/feeds.conf
+
+      - name: Enable TARGZ rootfs
+        run: |
+          cd /opt/make-lxc/istoreos
+          sed -i 's/# CONFIG_TARGET_ROOTFS_TARGZ is not set/CONFIG_TARGET_ROOTFS_TARGZ=y/' .config
+          grep -q "CONFIG_TARGET_ROOTFS_TARGZ" .config || echo "CONFIG_TARGET_ROOTFS_TARGZ=y" >> .config
+
+      - name: Update and install feeds
+        run: |
+          cd /opt/make-lxc/istoreos
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Set golang proxy
+        run: |
+          export GOPROXY=https://goproxy.cn,https://goproxy.io,https://proxy.golang.com.cn,direct
+          export GOSUMDB=sum.golang.google.cn
+          export GO111MODULE=on
+
+      - name: Configure build
+        run: |
+          cd /opt/make-lxc/istoreos
+          export FORCE_UNSAFE_CONFIGURE=1
+          make defconfig
+
+      -name: Check disk space
+       run: |
+         if [ $(df /opt/make-lxc/istoreos | awk 'NR==2 {print $4}') -lt 60000000 ]; then
+           echo "Error: Not enough disk space to build iStoreOS."
+           exit 1
+         else
+           echo "Sufficient disk space available."
+         fi
+
+      - name: Build firmware
+        id: build
+        continue-on-error: true
+        run: |
+          cd /opt/make-lxc/istoreos
+          export FORCE_UNSAFE_CONFIGURE=1
+          make -j$(nproc) V=s 2>&1 | tee build.log
+          echo "build_status=$?" >> $GITHUB_OUTPUT
+
+      - name: Check build result and prepare artifacts
+        id: prepare
+        run: |
+          cd /opt/make-lxc/istoreos
+          if [ -f bin/targets/x86/64/*-rootfs.tar.gz ]; then
+            echo "build_success=true" >> $GITHUB_OUTPUT
+            ROOTFS_FILE=$(ls bin/targets/x86/64/*-rootfs.tar.gz | head -n 1)
+            echo "rootfs_file=$ROOTFS_FILE" >> $GITHUB_OUTPUT
+            echo "Build successful! Found: $ROOTFS_FILE"
+          else
+            echo "build_success=false" >> $GITHUB_OUTPUT
+            echo "Build failed! Preserving build.log"
+          fi
+
+      - name: Upload build log on failure
+        if: steps.prepare.outputs.build_success != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-failed-${{ github.run_number }}
+          path: /opt/make-lxc/istoreos/build.log
+          retention-days: 30
+
+      - name: Create Release
+        if: steps.prepare.outputs.build_success == 'true'
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.update.outputs.branch_name }}-${{ github.run_number }}
+          release_name: ${{ steps.update.outputs.branch_name }}-build-${{ github.run_number }}
+          draft: false
+          prerelease: false
+          body: |
+            iStoreOS Build - Branch: ${{ steps.update.outputs.branch_name }}
+            
+            Build Date: ${{ github.event.head_commit.timestamp }}
+            Build Number: ${{ github.run_number }}
+            Commit: ${{ github.sha }}
+            Runner: Self-Hosted
+
+      - name: Upload Release Asset
+        if: steps.prepare.outputs.build_success == 'true'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ steps.prepare.outputs.rootfs_file }}
+          asset_name: istoreos-x86-64-rootfs.tar.gz
+          asset_content_type: application/gzip
