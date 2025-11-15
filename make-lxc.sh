@@ -50,8 +50,6 @@ wget -O feeds.conf https://fw0.koolcenter.com/iStoreOS/x86_64/feeds.conf
 # Modify .config to enable TARGZ rootfs
 sed -i 's/# CONFIG_TARGET_ROOTFS_TARGZ is not set/CONFIG_TARGET_ROOTFS_TARGZ=y/' .config
 
-# Disable incompatible drivers
-sed -i 's/CONFIG_PACKAGE_kmod-i40e=y/# CONFIG_PACKAGE_kmod-i40e is not set/' .config
 
 # If the line doesn't exist, add it
 grep -q "CONFIG_TARGET_ROOTFS_TARGZ" .config || echo "CONFIG_TARGET_ROOTFS_TARGZ=y" >> .config
@@ -59,6 +57,9 @@ grep -q "CONFIG_TARGET_ROOTFS_TARGZ" .config || echo "CONFIG_TARGET_ROOTFS_TARGZ
 # Update and install feeds
 $_pwd/scripts/feeds update -a
 $_pwd/scripts/feeds install -a
+
+# Uninstall incompatible drivers
+./scripts/feeds uninstall inter_i40e || true
 
 # Set FORCE_UNSAFE_CONFIGURE to bypass checks
 export FORCE_UNSAFE_CONFIGURE=1
