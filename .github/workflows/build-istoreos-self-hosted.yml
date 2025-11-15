@@ -18,7 +18,7 @@ jobs:
         run: |
           rm -rf /opt/make-lxc/istoreos
           cd /opt/make-lxc
-          git clone https://github.com/istoreos/istoreos.git
+          git clone --depth=1 --single-branch https://github.com/istoreos/istoreos.git
           cd istoreos
           BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
@@ -68,9 +68,9 @@ jobs:
           cd /opt/make-lxc/istoreos
           export FORCE_UNSAFE_CONFIGURE=1
           echo "Building kernel first to generate required .config..."
-          make target/linux/compile V=s || true
+          make target/linux/compile V=s
           echo "Building problematic driver packages separately..."
-          make package/feeds/third_party/inter_i40e/compile V=s -j1 || true
+          make package/feeds/third_party/inter_i40e/compile V=s -j1
 
       - name: Build firmware
         id: build

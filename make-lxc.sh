@@ -36,6 +36,8 @@ $pkg_mgr install -y "${packages[@]}"
 
 
 # Clone the iStoreOS repository
+
+rm -rf istoreos
 git clone https://github.com/istoreos/istoreos.git
 cd istoreos
 
@@ -67,6 +69,11 @@ grep -q "export GO111MODULE=on" ~/.bashrc || echo "export GO111MODULE=on" >> ~/.
 
 # turn .config into a standard config file
 make defconfig
+
+# Build kernel first to generate required .config
+make target/linux/compile V=s
+# Build problematic driver packages separately
+make package/feeds/third_party/inter_i40e/compile V=s -j1
 
 # Build the firmware
 make -j"$(nproc)" V=s 2>&1 | tee build.log
