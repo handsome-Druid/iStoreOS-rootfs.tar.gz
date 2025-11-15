@@ -1,4 +1,5 @@
 /istoreos
+*.txt
 
 CMakeLists.txt.user
 CMakeCache.txt

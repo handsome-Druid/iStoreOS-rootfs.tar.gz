@@ -70,6 +70,13 @@ jobs:
             echo "Sufficient disk space available."
           fi
 
+      - name: Pre-build problematic packages
+        run: |
+          cd /opt/make-lxc/istoreos
+          export FORCE_UNSAFE_CONFIGURE=1
+          echo "Building inter_i40e driver separately to avoid race conditions..."
+          make package/feeds/third_party/inter_i40e/compile V=s -j1 || true
+
       - name: Build firmware
         id: build
         run: |
