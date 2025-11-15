@@ -64,14 +64,14 @@ jobs:
           export FORCE_UNSAFE_CONFIGURE=1
           make defconfig
 
-      -name: Check disk space
-       run: |
-         if [ $(df /opt/make-lxc/istoreos | awk 'NR==2 {print $4}') -lt 60000000 ]; then
-           echo "Error: Not enough disk space to build iStoreOS."
-           exit 1
-         else
-           echo "Sufficient disk space available."
-         fi
+      - name: Check disk space
+        run: |
+          if [ $(df /opt/make-lxc/istoreos | awk 'NR==2 {print $4}') -lt 60000000 ]; then
+            echo "Error: Not enough disk space to build iStoreOS."
+            exit 1
+          else
+            echo "Sufficient disk space available."
+          fi
 
       - name: Build firmware
         id: build
