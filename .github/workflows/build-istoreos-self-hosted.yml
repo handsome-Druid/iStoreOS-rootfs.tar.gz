@@ -63,6 +63,14 @@ jobs:
             echo "Sufficient disk space available."
           fi
 
+      - name: Prepare build tools
+        run: |
+          cd /opt/make-lxc/istoreos
+          export FORCE_UNSAFE_CONFIGURE=1
+          echo "Downloading and preparing build tools..."
+          make tools/install -j$(nproc) V=s
+          make toolchain/install -j$(nproc) V=s
+
       - name: Pre-build kernel and dependencies
         run: |
           cd /opt/make-lxc/istoreos
