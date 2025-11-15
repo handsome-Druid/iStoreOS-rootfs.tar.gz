@@ -16,6 +16,16 @@ jobs:
       options: --privileged
     
     steps:
+      - name: Free up disk space
+        run: |
+          df -h
+          rm -rf /usr/share/dotnet
+          rm -rf /usr/local/lib/android
+          rm -rf /opt/ghc
+          rm -rf /opt/hostedtoolcache/CodeQL
+          docker rmi $(docker image ls -aq) || true
+          df -h
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
