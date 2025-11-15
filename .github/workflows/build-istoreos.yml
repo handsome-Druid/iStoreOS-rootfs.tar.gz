@@ -67,16 +67,29 @@ jobs:
           cd istoreos
           wget -O .config https://fw0.koolcenter.com/iStoreOS/x86_64/config.seed
           wget -O feeds.conf https://fw0.koolcenter.com/iStoreOS/x86_64/feeds.conf
-
       - name: Enable TARGZ rootfs
         run: |
           cd istoreos
           sed -i 's/# CONFIG_TARGET_ROOTFS_TARGZ is not set/CONFIG_TARGET_ROOTFS_TARGZ=y/' .config
-          grep -q "CONFIG_TARGET_ROOTFS_TARGZ" .config || echo "CONFIG_TARGET_ROOTFS_TARGZ=y" >> .config
-          # 禁用调试符号以节省空间
-          echo "CONFIG_KERNEL_DEBUG_INFO=n" >> .config
-          echo "CONFIG_KERNEL_DEBUG_INFO_REDUCED=n" >> .config
-          echo "CONFIG_KERNEL_DEBUG_INFO_BTF=n" >> .config
+
+          cat >> .config << 'EOF'
+          CONFIG_TARGET_ROOTFS_TARGZ=y
+          CONFIG_TARGET_ROOTFS_SQUASHFS=n
+          CONFIG_TARGET_ROOTFS_EXT4FS=n
+          CONFIG_TARGET_ROOTFS_INITRAMFS=n
+          CONFIG_TARGET_IMAGES=n
+          CONFIG_ALL_KMODS=n
+          CONFIG_ALL=n
+          CONFIG_KERNEL_DEBUG_INFO=n
+          CONFIG_KERNEL_DEBUG_INFO_REDUCED=n
+          CONFIG_KERNEL_DEBUG_INFO_BTF=n
+          CONFIG_SDK=n
+          CONFIG_IB=n
+          CONFIG_TARGET_BUILD_PACKAGES=n
+          CONFIG_STRIP_KERNEL_EXPORTS=y
+          CONFIG_KERNEL_BUILD_DOMAIN=""
+          CONFIG_KERNEL_BUILD_USER=""
+          EOF
 
       - name: Update and install feeds
         run: |
