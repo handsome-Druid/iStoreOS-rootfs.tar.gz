@@ -16,15 +16,10 @@ jobs:
       options: --privileged
     
     steps:
-      - name: Free up disk space
+      - name: Maximize build space
         run: |
           df -h
-          rm -rf /usr/share/dotnet
-          rm -rf /usr/local/lib/android
-          rm -rf /opt/ghc
-          rm -rf /opt/hostedtoolcache/CodeQL
-          docker rmi $(docker image ls -aq) || true
-          df -h
+          echo "Available space check"
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -78,6 +73,10 @@ jobs:
           cd istoreos
           sed -i 's/# CONFIG_TARGET_ROOTFS_TARGZ is not set/CONFIG_TARGET_ROOTFS_TARGZ=y/' .config
           grep -q "CONFIG_TARGET_ROOTFS_TARGZ" .config || echo "CONFIG_TARGET_ROOTFS_TARGZ=y" >> .config
+          # 禁用调试符号以节省空间
+          echo "CONFIG_KERNEL_DEBUG_INFO=n" >> .config
+          echo "CONFIG_KERNEL_DEBUG_INFO_REDUCED=n" >> .config
+          echo "CONFIG_KERNEL_DEBUG_INFO_BTF=n" >> .config
 
       - name: Update and install feeds
         run: |
