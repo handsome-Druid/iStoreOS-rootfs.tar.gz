@@ -11,18 +11,46 @@ on:
 jobs:
   build:
     runs-on: self-hosted
+    env:
+      FORCE_UNSAFE_CONFIGURE: 1
+      GOPROXY: https://goproxy.cn,https://goproxy.io,https://proxy.golang.com.cn,direct
+      GOSUMDB: sum.golang.google.cn
+      GO111MODULE: on
 
     steps:
-      - name: Clean and clone iStoreOS repository
+      - name: Update iStoreOS repository
         id: update
         run: |
-          rm -rf /opt/make-lxc/istoreos
-          cd /opt/make-lxc
-          git clone --depth=1 --single-branch https://github.com/istoreos/istoreos.git
-          cd istoreos
+          cd /opt/make-lxc/istoreos
+          REMOTE_DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | cut -d' ' -f5)
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          
+          if [ "$CURRENT_BRANCH" != "$REMOTE_DEFAULT_BRANCH" ]; then
+            echo "Remote default branch changed from $CURRENT_BRANCH to $REMOTE_DEFAULT_BRANCH"
+            echo "branch_changed=true" >> $GITHUB_OUTPUT
+            git fetch origin $REMOTE_DEFAULT_BRANCH --depth=1
+            git checkout $REMOTE_DEFAULT_BRANCH
+            git branch --set-upstream-to=origin/$REMOTE_DEFAULT_BRANCH
+          else
+            echo "branch_changed=false" >> $GITHUB_OUTPUT
+            git pull --depth=1
+          fi
+          
           BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
-          echo "Cloned fresh repository, branch: $BRANCH_NAME"
+          echo "Updated repository, branch: $BRANCH_NAME"
+
+      - name: Clean previous build artifacts
+        run: |
+          cd /opt/make-lxc/istoreos
+          if [ "${{ steps.update.outputs.branch_changed }}" = "true" ]; then
+            echo "Branch changed, performing complete clean..."
+            make distclean
+          else
+            echo "Same branch, performing regular clean..."
+            make clean
+          fi
+          ./scripts/feeds clean
 
       - name: Download config and feeds
         run: |
@@ -36,22 +64,20 @@ jobs:
           sed -i 's/# CONFIG_TARGET_ROOTFS_TARGZ is not set/CONFIG_TARGET_ROOTFS_TARGZ=y/' .config
           grep -q "CONFIG_TARGET_ROOTFS_TARGZ" .config || echo "CONFIG_TARGET_ROOTFS_TARGZ=y" >> .config
 
+      - name: Disable incompatible drivers
+        run: |
+          cd /opt/make-lxc/istoreos
+          sed -i 's/CONFIG_PACKAGE_kmod-i40e=y/# CONFIG_PACKAGE_kmod-i40e is not set/' .config
+
       - name: Update and install feeds
         run: |
           cd /opt/make-lxc/istoreos
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Set golang proxy
-        run: |
-          export GOPROXY=https://goproxy.cn,https://goproxy.io,https://proxy.golang.com.cn,direct
-          export GOSUMDB=sum.golang.google.cn
-          export GO111MODULE=on
-
       - name: Configure build
         run: |
           cd /opt/make-lxc/istoreos
-          export FORCE_UNSAFE_CONFIGURE=1
           make defconfig
 
       - name: Check disk space
@@ -63,28 +89,21 @@ jobs:
             echo "Sufficient disk space available."
           fi
 
-      - name: Prepare build tools
+      - name: Rebuild tools and toolchain
         run: |
           cd /opt/make-lxc/istoreos
-          export FORCE_UNSAFE_CONFIGURE=1
-          echo "Downloading and preparing build tools..."
-          make tools/install -j$(nproc) V=s
-          make toolchain/install -j$(nproc) V=s
-
-      - name: Pre-build kernel and dependencies
-        run: |
-          cd /opt/make-lxc/istoreos
-          export FORCE_UNSAFE_CONFIGURE=1
-          echo "Building kernel first to generate required .config..."
-          make target/linux/compile V=s
-          echo "Building problematic driver packages separately..."
-          make package/feeds/third_party/inter_i40e/compile V=s -j1
+          if [ "${{ steps.update.outputs.branch_changed }}" = "true" ]; then
+            echo "Branch changed, rebuilding tools and toolchain..."
+            make tools/install V=s -j$(nproc)
+            make toolchain/install V=s -j$(nproc)
+          else
+            echo "Same branch, skipping tools and toolchain rebuild."
+          fi
 
       - name: Build firmware
         id: build
         run: |
           cd /opt/make-lxc/istoreos
-          export FORCE_UNSAFE_CONFIGURE=1
           make -j$(nproc) V=s
 
       - name: Check build result and prepare artifacts

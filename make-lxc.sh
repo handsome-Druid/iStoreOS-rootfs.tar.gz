@@ -49,6 +49,10 @@ wget -O feeds.conf https://fw0.koolcenter.com/iStoreOS/x86_64/feeds.conf
 
 # Modify .config to enable TARGZ rootfs
 sed -i 's/# CONFIG_TARGET_ROOTFS_TARGZ is not set/CONFIG_TARGET_ROOTFS_TARGZ=y/' .config
+
+# Disable incompatible drivers
+sed -i 's/CONFIG_PACKAGE_kmod-i40e=y/# CONFIG_PACKAGE_kmod-i40e is not set/' .config
+
 # If the line doesn't exist, add it
 grep -q "CONFIG_TARGET_ROOTFS_TARGZ" .config || echo "CONFIG_TARGET_ROOTFS_TARGZ=y" >> .config
 
@@ -69,11 +73,6 @@ grep -q "export GO111MODULE=on" ~/.bashrc || echo "export GO111MODULE=on" >> ~/.
 
 # turn .config into a standard config file
 make defconfig
-
-# Build kernel first to generate required .config
-make target/linux/compile V=s
-# Build problematic driver packages separately
-make package/feeds/third_party/inter_i40e/compile V=s -j1
 
 # Build the firmware
 make -j"$(nproc)" V=s 2>&1 | tee build.log
