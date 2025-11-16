@@ -8,6 +8,10 @@ on:
     - cron: '0 0 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write       # 创建 release / push / 上传资产必须写
+  actions: write
+
 jobs:
   build:
     runs-on: self-hosted
