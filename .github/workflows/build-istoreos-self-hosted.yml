@@ -151,6 +151,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.prepare.outputs.rootfs_file }}
+          asset_path: /opt/make-lxc/istoreos/bin/targets/x86/64/istoreos-x86-64-generic-rootfs.tar.gz
           asset_name: istoreos-x86-64-rootfs.tar.gz
           asset_content_type: application/gzip
